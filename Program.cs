@@ -63,12 +63,15 @@ namespace HereTTP
             var output = new List<string>();
             foreach (var key in args.Keys)
             {
-                if (key != "path" && !(DEFAULT_ARGUMENTS.ContainsKey(key) && DEFAULT_ARGUMENTS[key] == args[key]) )
+                if (key != "path" && !(DEFAULT_ARGUMENTS.ContainsKey(key) && DEFAULT_ARGUMENTS[key] == args[key]))
                 {
                     output.Add(string.Format("{0}={1}", key, args[key]));
                 }
             }
-            File.WriteAllLines(SettingsFile, output.ToArray());
+            if (output.Count > 0)
+            {
+                File.WriteAllLines(SettingsFile, output.ToArray());
+            }
         }
 
         static void ReadCommandLine(string[] args, Dictionary<string, string> arguments)
@@ -86,6 +89,23 @@ namespace HereTTP
             }
         }
 
+        static void StartProc(string exe, bool withAdmin = false, string[] args = null)
+        {
+            var startInfo = new ProcessStartInfo();
+            startInfo.UseShellExecute = true;
+            startInfo.WorkingDirectory = Environment.CurrentDirectory;
+            startInfo.FileName = exe;
+            if (withAdmin)
+            {
+                startInfo.Verb = "runas";
+            }
+            if (args != null)
+            {
+                startInfo.Arguments = String.Join(" ", args);
+            }
+            Process p = Process.Start(startInfo);
+        }
+
         static bool Elevated(string[] args)
         {
             Console.Write("Checking admin privileges... ");
@@ -98,15 +118,29 @@ namespace HereTTP
             else
             {
                 Console.WriteLine("need to elevate.");
-                var startInfo = new ProcessStartInfo();
-                startInfo.UseShellExecute = true;
-                startInfo.WorkingDirectory = Environment.CurrentDirectory;
-                startInfo.FileName = Application.ExecutablePath;
-                startInfo.Verb = "runas";
-                startInfo.Arguments = String.Join(" ", args);
-                Process p = Process.Start(startInfo);
+                StartProc(Application.ExecutablePath, true, args);
                 return false;
             }
+        }
+
+        static SimpleHTTPServer StartServer(string path, string browser, int port)
+        {
+            var server = new SimpleHTTPServer(path, port);
+            server.Ready += new EventHandler((o, e) =>
+            {
+                Console.WriteLine("Ready!");
+                var builder = new UriBuilder();
+                builder.Host = "localhost";
+                if (port != 80)
+                {
+                    builder.Port = port;
+                }
+                builder.Scheme = "http:";
+                var url = builder.ToString();
+                Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
+                StartProc(browser, false, new string[] { url });
+            });
+            return server;
         }
 
         /// <summary>
@@ -124,37 +158,47 @@ namespace HereTTP
                 ReadCommandLine(args, arguments);
                 WriteINI(arguments);
 
+                string path = arguments["path"],
+                    browser = arguments["browser"],
+                    portDef = arguments["port"];
+
                 int minPort;
-                if (!int.TryParse(arguments["port"], out minPort))
+                if (!int.TryParse(portDef, out minPort))
                 {
-                    Console.Error.WriteLine("Invalide Port specification. Was {0}, expecting an intenger like 80, 81, 8080, 8383, etc.", arguments["port"]);
+                    Console.Error.WriteLine("Invalide Port specification. Was {0}, expecting an intenger like 80, 81, 8080, 8383, etc.", portDef);
                 }
-                else if (!Directory.Exists(arguments["path"]))
+                else if (!Directory.Exists(path))
                 {
-                    Console.Error.WriteLine("No directory from which to serve found at {0}", arguments["path"]);
+                    Console.Error.WriteLine("No directory from which to serve found at {0}", path);
                 }
-                else if (!File.Exists(arguments["browser"]) && arguments["browser"] != "explorer")
+                else if (!File.Exists(browser) && browser != "explorer")
                 {
-                    Console.Error.WriteLine("No file found for browster at path {0}", arguments["browser"]);
+                    Console.Error.WriteLine("No file found for browster at path {0}", browser);
                 }
                 else {
                     SimpleHTTPServer server = null;
+                    Console.WriteLine("Serving path '{0}'", path);
                     for (var port = minPort; port < 0xffff && server == null; ++port)
                     {
                         try
                         {
                             Console.WriteLine("Trying port {0}...", port);
-                            server = new SimpleHTTPServer(arguments["path"], port);
-                            server.Ready += new EventHandler((o, e) =>
-                            {
-                                Console.WriteLine("Ready!");
-                            });
+                            server = StartServer(path, browser, port);
                         }
-                        catch (Exception exp)
+                        catch
                         {
                             Console.Write("Port {0} already taken, ", port);
                         }
                     }
+                    Console.WriteLine("Hit X or CTRL+C to exit.");
+                    while (!server.Done)
+                    {
+                        if (Console.ReadKey().Key == ConsoleKey.X)
+                        {
+                            server.Stop();
+                        }
+                    }
+                    Console.WriteLine("Goodbye!");
                 }
             }
         }

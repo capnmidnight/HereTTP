@@ -115,6 +115,7 @@ class SimpleHTTPServer
     {
         serverThread.Abort();
         listener.Stop();
+        this.Done = true;
     }
 
     public event EventHandler Ready;
@@ -132,10 +133,10 @@ class SimpleHTTPServer
         {
             try
             {
-                HttpListenerContext context = listener.GetContext();
+                var context = listener.GetContext();
                 Process(context);
             }
-            catch (Exception ex)
+            catch
             {
  
             }
@@ -184,7 +185,7 @@ class SimpleHTTPServer
                 context.Response.StatusCode = (int)HttpStatusCode.OK;
                 context.Response.OutputStream.Flush();
             }
-            catch (Exception ex)
+            catch
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             }
@@ -193,6 +194,11 @@ class SimpleHTTPServer
         else
         {
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+            using (var writer = new StreamWriter(context.Response.OutputStream))
+            {
+                writer.WriteLine("Not found: '{0}'", filename.Replace(this.rootDirectory, ""));
+                writer.Flush();
+            } 
         }
         
         context.Response.OutputStream.Close();
