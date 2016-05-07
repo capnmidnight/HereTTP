@@ -1,9 +1,0 @@
-D:\Sean\Projects\Primrose-Site\HereTTP\bin\Debug\HereTTP.exe.config
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.csprojResolveAssemblyReference.cache
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.Form1.resources
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.Properties.Resources.resources
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.csproj.GenerateResource.Cache
-D:\Sean\Projects\Primrose-Site\HereTTP\bin\Debug\HereTTP.exe
-D:\Sean\Projects\Primrose-Site\HereTTP\bin\Debug\HereTTP.pdb
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.exe
-D:\Sean\Projects\Primrose-Site\HereTTP\obj\Debug\HereTTP.pdb
