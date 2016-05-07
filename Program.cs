@@ -87,6 +87,10 @@ namespace HereTTP
                     arguments[COMMAND_ALIASES[args[i]]] = args[i + 1];
                 }
             }
+            if (args.Length % 2 == 1)
+            {
+                arguments["path"] = args[args.Length - 1];
+            }
         }
 
         static void StartProc(string exe, bool withAdmin = false, string[] args = null)
@@ -128,7 +132,7 @@ namespace HereTTP
             var server = new SimpleHTTPServer(path, port);
             server.Ready += new EventHandler((o, e) =>
             {
-                Console.WriteLine("Ready!");
+                Console.WriteLine("Running. Hit X or CTRL+C to exit.");
                 var builder = new UriBuilder();
                 builder.Host = "localhost";
                 if (port != 80)
@@ -162,8 +166,8 @@ namespace HereTTP
                     browser = arguments["browser"],
                     portDef = arguments["port"];
 
-                int minPort;
-                if (!int.TryParse(portDef, out minPort))
+                int port;
+                if (!int.TryParse(portDef, out port))
                 {
                     Console.Error.WriteLine("Invalide Port specification. Was {0}, expecting an intenger like 80, 81, 8080, 8383, etc.", portDef);
                 }
@@ -176,21 +180,8 @@ namespace HereTTP
                     Console.Error.WriteLine("No file found for browster at path {0}", browser);
                 }
                 else {
-                    SimpleHTTPServer server = null;
-                    Console.WriteLine("Serving path '{0}'", path);
-                    for (var port = minPort; port < 0xffff && server == null; ++port)
-                    {
-                        try
-                        {
-                            Console.WriteLine("Trying port {0}...", port);
-                            server = StartServer(path, browser, port);
-                        }
-                        catch
-                        {
-                            Console.Write("Port {0} already taken, ", port);
-                        }
-                    }
-                    Console.WriteLine("Hit X or CTRL+C to exit.");
+                    Console.WriteLine("Serving path '{0}', port '{1}'", path, port);
+                    var server = StartServer(path, browser, port);
                     while (!server.Done)
                     {
                         if (Console.ReadKey().Key == ConsoleKey.X)
