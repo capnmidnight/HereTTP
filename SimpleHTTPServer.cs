@@ -199,8 +199,7 @@ class SimpleHTTPServer
                     response.ContentType = MIME.ContainsKey(ext) ? MIME[ext] : "application/octet-stream";
                     response.ContentLength64 = input.Length;
                     response.AddHeader("Date", DateTime.Now.ToString("r"));
-                    response.AddHeader("Last-Modified", File.GetLastWriteTime(filename).ToString("r"));
-
+                    
                     byte[] buffer = new byte[1024 * 16];
                     int nbytes;
                     while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
