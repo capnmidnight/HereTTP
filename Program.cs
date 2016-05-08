@@ -132,19 +132,54 @@ namespace HereTTP
             var server = new SimpleHTTPServer(path, port);
             server.Ready += new EventHandler((o, e) =>
             {
-                Console.WriteLine("Running. Hit X or CTRL+C to exit.");
-                var builder = new UriBuilder();
-                builder.Host = "localhost";
-                if (port != 80)
-                {
-                    builder.Port = port;
-                }
-                builder.Scheme = "http:";
-                var url = builder.ToString();
-                Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
-                StartProc(browser, false, new string[] { url });
+                StartBrowser(browser, port);
             });
             return server;
+        }
+
+        private static void StartBrowser(string browser, int port)
+        {
+            Console.WriteLine("Running. Hit X or CTRL+C to exit. Hit B to select a new browser.");
+            var builder = new UriBuilder();
+            builder.Host = "localhost";
+            if (port != 80)
+            {
+                builder.Port = port;
+            }
+            builder.Scheme = "http:";
+            var url = builder.ToString();
+            Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
+            StartProc(browser, false, new string[] { url });
+        }
+
+        static OpenFileDialog openFile = null;
+        static void ShowFindBrowserDialog(Dictionary<string, string> args)
+        {
+            if (openFile == null)
+            {
+                openFile = new OpenFileDialog
+                {
+                    AddExtension = true,
+                    AutoUpgradeEnabled = true,
+                    CheckFileExists = true,
+                    CheckPathExists = true,
+                    DefaultExt = ".exe",
+                    DereferenceLinks = true,
+                    Filter = "Executable files|*.exe|Command files|*.cmd|Batch scripts|*.bat|All files|*.*",
+                    FilterIndex = 0,
+                    InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    Multiselect = false,
+                    Title = "Specify custom browser executable path."
+                };
+            }
+            var result = openFile.ShowDialog();
+            if (result == DialogResult.OK)
+            {
+                if (File.Exists(openFile.FileName))
+                {
+                    args["browser"] = openFile.FileName;
+                }
+            }
         }
 
         /// <summary>
@@ -184,12 +219,24 @@ namespace HereTTP
                     var server = StartServer(path, browser, port);
                     while (!server.Done)
                     {
-                        if (Console.ReadKey().Key == ConsoleKey.X)
+                        var key = Console.ReadKey();
+                        if (key.Key == ConsoleKey.X)
                         {
                             server.Stop();
                         }
+                        else if (key.Key == ConsoleKey.B)
+                        {
+                            ShowFindBrowserDialog(arguments);
+                            browser = arguments["browser"];
+                            WriteINI(arguments);
+                            StartBrowser(browser, port);
+                        }
                     }
                     Console.WriteLine("Goodbye!");
+                    if (openFile != null)
+                    {
+                        openFile.Dispose();
+                    }
                 }
             }
         }

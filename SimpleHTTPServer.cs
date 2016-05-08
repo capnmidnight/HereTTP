@@ -155,15 +155,15 @@ class SimpleHTTPServer
     private void Process(HttpListenerContext context)
     {
         string requestPath = context.Request.Url.AbsolutePath;
-        Console.WriteLine(requestPath);
+        Console.Write(requestPath);
         requestPath = requestPath.Substring(1);
 
-        if (requestPath[requestPath.Length] == '/')
+        if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
         {
             requestPath = requestPath.Substring(0, requestPath.Length - 1);
         }
 
-        requestPath.Replace('/', Path.PathSeparator);
+        requestPath = requestPath.Replace('/', Path.DirectorySeparatorChar);
         var filename = Path.Combine(rootDirectory, requestPath);
         if (Directory.Exists(filename))
         {
@@ -177,6 +177,8 @@ class SimpleHTTPServer
                 }
             }
         }
+
+        Console.Write(" --> {0} --> ", filename);
 
         if (File.Exists(filename))
         {
@@ -198,7 +200,7 @@ class SimpleHTTPServer
                 input.Close();
 
                 context.Response.StatusCode = (int)HttpStatusCode.OK;
-                context.Response.OutputStream.Flush();
+                Console.WriteLine(HttpStatusCode.OK);
             }
             catch
             {
@@ -210,17 +212,18 @@ class SimpleHTTPServer
             Error(context.Response, HttpStatusCode.NotFound, "Not found: '{0}'", filename.Replace(this.rootDirectory, ""));
         }
 
+        context.Response.OutputStream.Flush();
         context.Response.OutputStream.Close();
     }
 
     void Error(HttpListenerResponse response, HttpStatusCode code, string format, params string[] args)
     {
+        Console.WriteLine(code);
         response.StatusCode = (int)code;
 
         using (var writer = new StreamWriter(response.OutputStream))
         {
             writer.WriteLine(format, args);
-            writer.Flush();
         }
     }
 
