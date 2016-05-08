@@ -154,66 +154,75 @@ class SimpleHTTPServer
 
     private void Process(HttpListenerContext context)
     {
-        string requestPath = context.Request.Url.AbsolutePath;
+        var request = context.Request;
+        var response = context.Response;
+        string requestPath = request.Url.AbsolutePath;
         Console.Write(requestPath);
-        requestPath = requestPath.Substring(1);
-
-        if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
+        if (request.HttpMethod != "GET")
         {
-            requestPath = requestPath.Substring(0, requestPath.Length - 1);
-        }
-
-        requestPath = requestPath.Replace('/', Path.DirectorySeparatorChar);
-        var filename = Path.Combine(rootDirectory, requestPath);
-        if (Directory.Exists(filename))
-        {
-            for (int i = 0; i < INDEX_FILES.Length; ++i)
-            {
-                var test = Path.Combine(filename, INDEX_FILES[i]);
-                if (File.Exists(test))
-                {
-                    filename = test;
-                    break;
-                }
-            }
-        }
-
-        Console.Write(" --> {0} --> ", filename);
-
-        if (File.Exists(filename))
-        {
-            try
-            {
-                Stream input = new FileStream(filename, FileMode.Open);
-
-                //Adding permanent http response headers
-                var ext = Path.GetExtension(filename);
-                context.Response.ContentType = MIME.ContainsKey(ext) ? MIME[ext] : "application/octet-stream";
-                context.Response.ContentLength64 = input.Length;
-                context.Response.AddHeader("Date", DateTime.Now.ToString("r"));
-                context.Response.AddHeader("Last-Modified", File.GetLastWriteTime(filename).ToString("r"));
-
-                byte[] buffer = new byte[1024 * 16];
-                int nbytes;
-                while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
-                    context.Response.OutputStream.Write(buffer, 0, nbytes);
-                input.Close();
-
-                context.Response.StatusCode = (int)HttpStatusCode.OK;
-                Console.WriteLine(HttpStatusCode.OK);
-            }
-            catch
-            {
-                Error(context.Response, HttpStatusCode.InternalServerError, "ERRRRRROR: '{0}'", filename.Replace(this.rootDirectory, ""));
-            }
+            Error(response, HttpStatusCode.MethodNotAllowed, "Method not allowed.");
         }
         else
         {
-            Error(context.Response, HttpStatusCode.NotFound, "Not found: '{0}'", filename.Replace(this.rootDirectory, ""));
+            requestPath = requestPath.Substring(1);
+
+            if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
+            {
+                requestPath = requestPath.Substring(0, requestPath.Length - 1);
+            }
+
+            requestPath = requestPath.Replace('/', Path.DirectorySeparatorChar);
+            var filename = Path.Combine(rootDirectory, requestPath);
+            if (Directory.Exists(filename))
+            {
+                for (int i = 0; i < INDEX_FILES.Length; ++i)
+                {
+                    var test = Path.Combine(filename, INDEX_FILES[i]);
+                    if (File.Exists(test))
+                    {
+                        filename = test;
+                        break;
+                    }
+                }
+            }
+
+            Console.Write(" --> {0} --> ", filename);
+
+            if (File.Exists(filename))
+            {
+                try
+                {
+                    Stream input = new FileStream(filename, FileMode.Open);
+
+                    //Adding permanent http response headers
+                    var ext = Path.GetExtension(filename);
+                    response.ContentType = MIME.ContainsKey(ext) ? MIME[ext] : "application/octet-stream";
+                    response.ContentLength64 = input.Length;
+                    response.AddHeader("Date", DateTime.Now.ToString("r"));
+                    response.AddHeader("Last-Modified", File.GetLastWriteTime(filename).ToString("r"));
+
+                    byte[] buffer = new byte[1024 * 16];
+                    int nbytes;
+                    while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
+                        response.OutputStream.Write(buffer, 0, nbytes);
+                    input.Close();
+
+                    response.StatusCode = (int)HttpStatusCode.OK;
+                    Console.WriteLine(HttpStatusCode.OK);
+                }
+                catch
+                {
+                    Error(response, HttpStatusCode.InternalServerError, "ERRRRRROR: '{0}'", filename.Replace(this.rootDirectory, ""));
+                }
+            }
+            else
+            {
+                Error(response, HttpStatusCode.NotFound, "Not found: '{0}'", filename.Replace(this.rootDirectory, ""));
+            }
         }
 
-        context.Response.OutputStream.Flush();
-        context.Response.OutputStream.Close();
+        response.OutputStream.Flush();
+        response.OutputStream.Close();
     }
 
     void Error(HttpListenerResponse response, HttpStatusCode code, string format, params string[] args)

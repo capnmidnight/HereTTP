@@ -93,7 +93,7 @@ namespace HereTTP
             }
         }
 
-        static void StartProc(string exe, bool withAdmin = false, string[] args = null)
+        static void StartProc(string exe, bool withAdmin, params string[] args)
         {
             var startInfo = new ProcessStartInfo();
             startInfo.UseShellExecute = true;
@@ -149,7 +149,14 @@ namespace HereTTP
             builder.Scheme = "http:";
             var url = builder.ToString();
             Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
-            StartProc(browser, false, new string[] { url });
+            if (browser.Contains("chrome"))
+            {
+                StartProc(browser, false, "--kiosk", url);
+            }
+            else
+            {
+                StartProc(browser, false, url);
+            }
         }
 
         static OpenFileDialog openFile = null;
