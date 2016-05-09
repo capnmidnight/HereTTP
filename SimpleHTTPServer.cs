@@ -105,7 +105,7 @@ class SimpleHTTPServer
     /// <param name="port">Port of the server.</param>
     public SimpleHTTPServer(string path, int port)
     {
-        this.Initialize(path, port);
+        Initialize(path, port);
     }
 
     /// <summary>
@@ -115,40 +115,22 @@ class SimpleHTTPServer
     {
         serverThread.Abort();
         listener.Stop();
-        this.Done = true;
+        Done = true;
     }
-
-    public event EventHandler Ready;
 
     private void Listen()
     {
-        listener = new HttpListener();
-        listener.Prefixes.Add(string.Format("http://*:{0}/", port));
-        try
+        while (!Done)
         {
-            listener.Start();
-            if (this.Ready != null)
+            try
             {
-                this.Ready.Invoke(this, EventArgs.Empty);
+                var context = listener.GetContext();
+                Process(context);
             }
-            while (true)
+            catch
             {
-                try
-                {
-                    var context = listener.GetContext();
-                    Process(context);
-                }
-                catch
-                {
 
-                }
             }
-
-        }
-        catch
-        {
-            Console.Error.WriteLine("Port {0} is already in use. Please try another one.", port);
-            this.Done = true;
         }
     }
 
@@ -156,78 +138,104 @@ class SimpleHTTPServer
     {
         var request = context.Request;
         var response = context.Response;
-        string requestPath = request.Url.AbsolutePath;
-        Console.Write(requestPath);
-        if (request.HttpMethod != "GET")
+        if (request.HttpMethod == "GET")
         {
-            Error(response, HttpStatusCode.MethodNotAllowed, "Method not allowed.");
-        }
-        else
-        {
-            requestPath = requestPath.Substring(1);
+            string requestPath = MassageRequestPath(request.Url.AbsolutePath),
+                filename = MakeFileName(requestPath),
+                shortName = MakeShortName(filename);
 
-            if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
-            {
-                requestPath = requestPath.Substring(0, requestPath.Length - 1);
-            }
-
-            requestPath = requestPath.Replace('/', Path.DirectorySeparatorChar);
-            var filename = Path.Combine(rootDirectory, requestPath);
-            if (Directory.Exists(filename))
-            {
-                for (int i = 0; i < INDEX_FILES.Length; ++i)
-                {
-                    var test = Path.Combine(filename, INDEX_FILES[i]);
-                    if (File.Exists(test))
-                    {
-                        filename = test;
-                        break;
-                    }
-                }
-            }
-
-            Console.Write(" --> {0} --> ", filename);
+            Console.Write(" --> {0} --> ", shortName);
 
             if (File.Exists(filename))
             {
                 try
                 {
-                    Stream input = new FileStream(filename, FileMode.Open);
-
-                    //Adding permanent http response headers
-                    var ext = Path.GetExtension(filename);
-                    response.ContentType = MIME.ContainsKey(ext) ? MIME[ext] : "application/octet-stream";
-                    response.ContentLength64 = input.Length;
-                    response.AddHeader("Date", DateTime.Now.ToString("r"));
-                    
-                    byte[] buffer = new byte[1024 * 16];
-                    int nbytes;
-                    while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
-                        response.OutputStream.Write(buffer, 0, nbytes);
-                    input.Close();
-
-                    response.StatusCode = (int)HttpStatusCode.OK;
-                    Console.WriteLine(HttpStatusCode.OK);
+                    SendFile(response, filename);
                 }
                 catch
                 {
-                    Error(response, HttpStatusCode.InternalServerError, "ERRRRRROR: '{0}'", filename.Replace(this.rootDirectory, ""));
+                    Error(response, HttpStatusCode.InternalServerError, "ERRRRRROR: '{0}'", shortName);
                 }
             }
             else
             {
-                Error(response, HttpStatusCode.NotFound, "Not found: '{0}'", filename.Replace(this.rootDirectory, ""));
+                Error(response, HttpStatusCode.NotFound, "Not found: '{0}'", shortName);
             }
+        }
+        else
+        {
+            Error(response, HttpStatusCode.MethodNotAllowed, "Method not allowed.");
         }
 
         response.OutputStream.Flush();
         response.OutputStream.Close();
     }
 
+    private static void SendFile(HttpListenerResponse response, string filename)
+    {
+        using (Stream input = new FileStream(filename, FileMode.Open))
+        {
+            var ext = Path.GetExtension(filename);
+            response.ContentType = MIME.ContainsKey(ext) ? MIME[ext] : "application/octet-stream";
+            response.ContentLength64 = input.Length;
+            response.AddHeader("Date", DateTime.Now.ToString("r"));
+
+            byte[] buffer = new byte[1024 * 16];
+            int nbytes;
+            while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
+                response.OutputStream.Write(buffer, 0, nbytes);
+            input.Close();
+        }
+        SetStatus(response, HttpStatusCode.OK);
+    }
+
+    private string MakeShortName(string filename)
+    {
+        var shortName = filename.Replace(rootDirectory, "");
+        if (shortName.Length > 0 && shortName[0] == Path.DirectorySeparatorChar)
+        {
+            shortName = shortName.Substring(1);
+        }
+
+        return shortName;
+    }
+
+    private string MakeFileName(string requestPath)
+    {
+        var filename = Path.Combine(rootDirectory, requestPath);
+        if (Directory.Exists(filename))
+        {
+            for (int i = 0; i < INDEX_FILES.Length; ++i)
+            {
+                var test = Path.Combine(filename, INDEX_FILES[i]);
+                if (File.Exists(test))
+                {
+                    filename = test;
+                    break;
+                }
+            }
+        }
+
+        return filename;
+    }
+
+    private static string MassageRequestPath(string requestPath)
+    {
+        Console.Write(requestPath);
+        requestPath = requestPath.Substring(1);
+
+        if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
+        {
+            requestPath = requestPath.Substring(0, requestPath.Length - 1);
+        }
+
+        requestPath = requestPath.Replace('/', Path.DirectorySeparatorChar);
+        return requestPath;
+    }
+
     void Error(HttpListenerResponse response, HttpStatusCode code, string format, params string[] args)
     {
-        Console.WriteLine(code);
-        response.StatusCode = (int)code;
+        SetStatus(response, code);
 
         using (var writer = new StreamWriter(response.OutputStream))
         {
@@ -235,10 +243,20 @@ class SimpleHTTPServer
         }
     }
 
+    private static void SetStatus(HttpListenerResponse response, HttpStatusCode code)
+    {
+        Console.WriteLine(code);
+        response.StatusCode = (int)code;
+    }
+
     private void Initialize(string path, int port)
     {
-        this.rootDirectory = path;
+        rootDirectory = path;
         this.port = port;
+
+        listener = new HttpListener();
+        listener.Prefixes.Add(string.Format("http://*:{0}/", port));
+        listener.Start();
         serverThread = new Thread(this.Listen);
         serverThread.Start();
     }

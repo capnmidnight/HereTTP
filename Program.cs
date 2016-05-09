@@ -12,18 +12,38 @@ namespace HereTTP
         static Dictionary<string, string> COMMAND_ALIASES = new Dictionary<string, string>()
         {
             {"--port", "port" },
-            {"\\P", "port" },
             {"-p", "port" },
+            {"/P", "port" },
+
             {"--browser", "browser" },
-            {"\\B", "browser" },
-            {"-b", "browser" }
+            {"-b", "browser" },
+            {"/B", "browser" },
+
+            {"--directory", "path" },
+            {"-d", "path" },
+            {"/D", "path" },
+
+            {"--mode", "mode" },
+            {"-m", "mode" },
+            {"/M", "mode" }
+        };
+
+        static Dictionary<string, KeyValuePair<string, string>> COMMAND_SHORTCUTS = new Dictionary<string, KeyValuePair<string, string>>()
+        {
+            {"--kiosk", new KeyValuePair<string, string>("mode", "kiosk" ) },
+            {"-k", new KeyValuePair<string, string>("mode", "kiosk" ) },
+            {"/K", new KeyValuePair<string, string>("mode", "kiosk" ) },
+
+            {"--help", new KeyValuePair<string, string>("help", "help") },
+            {"/?", new KeyValuePair<string, string>("help", "help") }
         };
 
         static Dictionary<string, string> DEFAULT_ARGUMENTS = new Dictionary<string, string>()
         {
             {"port", "80" },
             {"browser", "explorer" },
-            {"path", Environment.CurrentDirectory }
+            {"path", Environment.CurrentDirectory },
+            {"mode", "default" }
         };
 
         static void SetDefaults(Dictionary<string, string> args)
@@ -38,7 +58,7 @@ namespace HereTTP
         {
             get
             {
-                return Path.Combine(Environment.CurrentDirectory, "settings.ini");
+                return Path.Combine(Environment.CurrentDirectory, "httpd.ini");
             }
         }
 
@@ -49,10 +69,12 @@ namespace HereTTP
                 var lines = File.ReadAllLines(SettingsFile);
                 for (var i = 0; i < lines.Length; ++i)
                 {
-                    if (lines[i].Contains("="))
+                    var sep = lines[i].IndexOf('=');
+                    if (sep > -1)
                     {
-                        var parts = lines[i].Split('=');
-                        args[parts[0]] = parts[1];
+                        var key = lines[i].Substring(0, sep);
+                        var value = lines[i].Substring(sep + 1);
+                        args[key] = value;
                     }
                 }
             }
@@ -63,7 +85,7 @@ namespace HereTTP
             var output = new List<string>();
             foreach (var key in args.Keys)
             {
-                if (key != "path" && !(DEFAULT_ARGUMENTS.ContainsKey(key) && DEFAULT_ARGUMENTS[key] == args[key]))
+                if (!(DEFAULT_ARGUMENTS.ContainsKey(key) && DEFAULT_ARGUMENTS[key] == args[key]))
                 {
                     output.Add(string.Format("{0}={1}", key, args[key]));
                 }
@@ -72,24 +94,48 @@ namespace HereTTP
             {
                 File.WriteAllLines(SettingsFile, output.ToArray());
             }
+            else if (File.Exists(SettingsFile))
+            {
+                File.Delete(SettingsFile);
+            }
         }
 
         static void ReadCommandLine(string[] args, Dictionary<string, string> arguments)
         {
-            for (int i = 0; i < args.Length - 1; i += 2)
+            for (int i = 0; i < args.Length; ++i)
             {
-                if (!COMMAND_ALIASES.ContainsKey(args[i]))
+                if ((args[i].Length > 0 && (args[i][0] == '"' || args[i][0] == '\'') && args[i][0] == args[i][args[i].Length - 1]))
                 {
-                    Console.Error.WriteLine("Unknown command switch: {0}.", args[i]);
+                    args[i] = args[i].Substring(1, args[i].Length - 2);
+                }
+
+                if (COMMAND_ALIASES.ContainsKey(args[i]))
+                {
+                    if (i < args.Length - 1)
+                    {
+                        arguments[COMMAND_ALIASES[args[i]]] = args[i + 1];
+                        ++i;
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Unknown command switch: {0}.", args[i]);
+                        return;
+                    }
+                }
+                else if (COMMAND_SHORTCUTS.ContainsKey(args[i]))
+                {
+                    var pair = COMMAND_SHORTCUTS[args[i]];
+                    arguments[pair.Key] = pair.Value;
+                }
+                else if (Directory.Exists(args[i]))
+                {
+                    arguments["path"] = args[i];
+                }
+                else
+                {
+                    Console.Error.WriteLine("Missing value for {0} switch.", args[i]);
                     return;
                 }
-                else {
-                    arguments[COMMAND_ALIASES[args[i]]] = args[i + 1];
-                }
-            }
-            if (args.Length % 2 == 1)
-            {
-                arguments["path"] = args[args.Length - 1];
             }
         }
 
@@ -127,17 +173,7 @@ namespace HereTTP
             }
         }
 
-        static SimpleHTTPServer StartServer(string path, string browser, int port)
-        {
-            var server = new SimpleHTTPServer(path, port);
-            server.Ready += new EventHandler((o, e) =>
-            {
-                StartBrowser(browser, port);
-            });
-            return server;
-        }
-
-        private static void StartBrowser(string browser, int port)
+        private static void StartBrowser(string browser, int port, string mode)
         {
             Console.WriteLine("Running. Hit X or CTRL+C to exit. Hit B to select a new browser.");
             var builder = new UriBuilder();
@@ -149,14 +185,21 @@ namespace HereTTP
             builder.Scheme = "http:";
             var url = builder.ToString();
             Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
-            if (browser.Contains("chrome"))
+
+            var parameters = new List<string>();
+            if (mode == "kiosk")
             {
-                StartProc(browser, false, "--kiosk", url);
+                if (browser.Contains("chrome"))
+                {
+                    parameters.Add("--kiosk");
+                }
+                else if (browser.Contains("iexplore"))
+                {
+                    parameters.Add("-k");
+                }
             }
-            else
-            {
-                StartProc(browser, false, url);
-            }
+            parameters.Add(url);
+            StartProc(browser, false, parameters.ToArray());
         }
 
         static OpenFileDialog openFile = null;
@@ -195,18 +238,54 @@ namespace HereTTP
         [STAThread]
         static void Main(string[] args)
         {
-            if (Elevated(args))
-            {
-                var arguments = new Dictionary<string, string>();
+            var arguments = new Dictionary<string, string>();
 
-                SetDefaults(arguments);
-                ReadINI(arguments);
-                ReadCommandLine(args, arguments);
+            SetDefaults(arguments);
+            ReadINI(arguments);
+            ReadCommandLine(args, arguments);
+
+            if (arguments.ContainsKey("help"))
+            {
+                Console.WriteLine(@"Starts a basic, static HTTP server. Useful for developing and test web sites locally. DO NOT RUN IN PRODUCTION!
+
+StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPath] [(--mode|-m|\M) startMode] [(--kiosk|-k|/K)] [(--directory|-d|/D)][dirPath]
+
+    --help              This help text.
+    /?                  Alias for --help.
+
+    --port              Specify a port value on which to listen.
+    -p                  Alias for --port.
+    /P                  Alies for --port.
+    portValue           An integer greater than or equal to 80 and less than 65536. Defaults to 80.
+
+    --browser           Specify an alternative browser to use to start URLs.
+    -b                  An alias for --browser.
+    /B                  An alias for --browser.
+    browserPath         A relative or fully qualified path to the browser executable. Defaults to using the Windows Shell to open the URL.
+
+    --mode              Specify the start mode for the Chrome or Internet Explorer. Firefox is not available.
+    -m                  An alias for --mode.
+    /M                  An alies for -m.
+    startMode           Set to 'kiosk' to start in full screen mode. Defaults to no kiosk mode.
+    --kiosk             An alias for '--mode kiosk'.
+    -k                  An alias for '--mode kiosk'.
+    /K                  An alias for '--mode kiosk'.
+
+    --directory         Specify the path where the files are located that should be served. The command switch is not necessary for specifying the path in the last argument position.
+    -d                  An alias for --directory.
+    /D                  An alias for --directory.
+    dirPath             A relative or fully qualified path to a directory full of web content files.
+
+Any settings away from the default will cause a 'httpd.ini' file to be written in the current directory, recording them for the next invocation.");
+            }
+            else
+            {
                 WriteINI(arguments);
 
                 string path = arguments["path"],
                     browser = arguments["browser"],
-                    portDef = arguments["port"];
+                    portDef = arguments["port"],
+                    mode = arguments["mode"];
 
                 int port;
                 if (!int.TryParse(portDef, out port))
@@ -219,27 +298,55 @@ namespace HereTTP
                 }
                 else if (!File.Exists(browser) && browser != "explorer")
                 {
-                    Console.Error.WriteLine("No file found for browster at path {0}", browser);
+                    Console.Error.WriteLine("No file found for browser at path {0}", browser);
                 }
-                else {
-                    Console.WriteLine("Serving path '{0}', port '{1}'", path, port);
-                    var server = StartServer(path, browser, port);
-                    while (!server.Done)
+                else if (mode != "default" && mode != "kiosk")
+                {
+                    Console.Error.WriteLine("Unknown mode '{0}'", mode);
+                }
+                else if (Elevated(args))
+                {
+                    Console.WriteLine("Serving path '{0}'", path);
+                    SimpleHTTPServer server = null;
+                    for (int p = port; p < 0xffff; ++p)
                     {
-                        var key = Console.ReadKey();
-                        if (key.Key == ConsoleKey.X)
+                        Console.WriteLine("Trying port '{0}'", p);
+                        try
                         {
-                            server.Stop();
+                            server = new SimpleHTTPServer(path, p);
+                            port = p;
+                            arguments["port"] = p.ToString();
+                            StartBrowser(browser, port, mode);
+                            break;
                         }
-                        else if (key.Key == ConsoleKey.B)
+                        catch
                         {
-                            ShowFindBrowserDialog(arguments);
-                            browser = arguments["browser"];
-                            WriteINI(arguments);
-                            StartBrowser(browser, port);
+                            Console.Error.WriteLine("Port {0} is already in use. Trying another one.", p);
                         }
                     }
-                    Console.WriteLine("Goodbye!");
+                    if (server != null)
+                    {
+                        while (!server.Done)
+                        {
+                            var key = Console.ReadKey();
+                            if (key.Key == ConsoleKey.X)
+                            {
+                                server.Stop();
+                            }
+                            else if (key.Key == ConsoleKey.B)
+                            {
+                                ShowFindBrowserDialog(arguments);
+                                browser = arguments["browser"];
+                                WriteINI(arguments);
+                                StartBrowser(browser, port, mode);
+                            }
+                        }
+                        Console.WriteLine("Goodbye!");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("Couldn't find an open port.");
+                    }
                     if (openFile != null)
                     {
                         openFile.Dispose();
