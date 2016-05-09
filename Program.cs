@@ -307,13 +307,13 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                 else if (Elevated(args))
                 {
                     Console.WriteLine("Serving path '{0}'", path);
-                    SimpleHTTPServer server = null;
+                    HTTPServer server = null;
                     for (int p = port; p < 0xffff; ++p)
                     {
                         Console.WriteLine("Trying port '{0}'", p);
                         try
                         {
-                            server = new SimpleHTTPServer(path, p);
+                            server = new HTTPServer(path, p);
                             port = p;
                             arguments["port"] = p.ToString();
                             StartBrowser(browser, port, mode);
