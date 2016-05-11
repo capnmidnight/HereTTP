@@ -23,6 +23,10 @@ namespace HereTTP
             {"-d", "path" },
             {"/D", "path" },
 
+            {"--url", "url" },
+            {"-u", "url" },
+            {"/U", "url" },
+
             {"--mode", "mode" },
             {"-m", "mode" },
             {"/M", "mode" }
@@ -43,7 +47,8 @@ namespace HereTTP
             {"port", "80" },
             {"browser", "explorer" },
             {"path", Environment.CurrentDirectory },
-            {"mode", "default" }
+            {"mode", "default" },
+            {"url", "" }
         };
 
         static void SetDefaults(Dictionary<string, string> args)
@@ -173,7 +178,7 @@ namespace HereTTP
             }
         }
 
-        private static void StartBrowser(string browser, int port, string mode)
+        private static void StartBrowser(string browser, int port, string mode, string url)
         {
             Console.WriteLine("Running. Hit X or CTRL+C to exit. Hit B to select a new browser.");
             var builder = new UriBuilder();
@@ -183,8 +188,9 @@ namespace HereTTP
                 builder.Port = port;
             }
             builder.Scheme = "http:";
-            var url = builder.ToString();
-            Console.WriteLine("Starting browser '{0}' at '{1}'", browser, url);
+            builder.Path = url;
+            var startURL = builder.ToString();
+            Console.WriteLine("Starting browser '{0}' at '{1}'", browser, startURL);
 
             var parameters = new List<string>();
             if (mode == "kiosk")
@@ -198,7 +204,7 @@ namespace HereTTP
                     parameters.Add("-k");
                 }
             }
-            parameters.Add(url);
+            parameters.Add(startURL);
             StartProc(browser, false, parameters.ToArray());
         }
 
@@ -248,7 +254,14 @@ namespace HereTTP
             {
                 Console.WriteLine(@"Starts a basic, static HTTP server. Useful for developing and test web sites locally. DO NOT RUN IN PRODUCTION!
 
-StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPath] [(--mode|-m|\M) startMode] [(--kiosk|-k|/K)] [(--directory|-d|/D)][dirPath]
+StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPath] [(--url|-u|/U) urlPath] [(--mode|-m|\M) startMode] [(--kiosk|-k|/K)] [(--directory|-d|/D)][dirPath]
+
+Example:
+
+    # Start the server from a sibling directory of the current directory, on port 8383, and open the browser at the URL http://localhost:8383/doc/
+    StartHere -p 8383 -u /doc/ ../Primrose
+
+Switches:
 
     --help              This help text.
     /?                  Alias for --help.
@@ -262,6 +275,11 @@ StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPat
     -b                  An alias for --browser.
     /B                  An alias for --browser.
     browserPath         A relative or fully qualified path to the browser executable. Defaults to using the Windows Shell to open the URL.
+
+    --url               Specify the path portion of the URL to open in the browser.
+    -u                  An alias for --url.
+    /U                  An alias for --url.
+    urlPath             The program will assume ""localhost"" as the host, and append the port number if it is not 80. Defaults to the empty string.
 
     --mode              Specify the start mode for the Chrome or Internet Explorer. Firefox is not available.
     -m                  An alias for --mode.
@@ -285,7 +303,8 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                 string path = arguments["path"],
                     browser = arguments["browser"],
                     portDef = arguments["port"],
-                    mode = arguments["mode"];
+                    mode = arguments["mode"],
+                    url = arguments["url"];
 
                 int port;
                 if (!int.TryParse(portDef, out port))
@@ -316,7 +335,7 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                             server = new HTTPServer(path, p);
                             port = p;
                             arguments["port"] = p.ToString();
-                            StartBrowser(browser, port, mode);
+                            StartBrowser(browser, port, mode, url);
                             break;
                         }
                         catch
@@ -338,7 +357,7 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                                 ShowFindBrowserDialog(arguments);
                                 browser = arguments["browser"];
                                 WriteINI(arguments);
-                                StartBrowser(browser, port, mode);
+                                StartBrowser(browser, port, mode, url);
                             }
                         }
                         Console.WriteLine("Goodbye!");
