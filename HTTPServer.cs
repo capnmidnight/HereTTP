@@ -193,7 +193,7 @@ namespace HereTTP
         private static void Redirect(HttpListenerResponse response, string filename)
         {
             response.AddHeader("Location", filename);
-            SetStatus(response, HttpStatusCode.TemporaryRedirect);
+            SetStatus(response, HttpStatusCode.MovedPermanently);
         }
 
         private static void SendFile(HttpListenerResponse response, string filename)
