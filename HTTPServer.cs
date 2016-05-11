@@ -149,13 +149,23 @@ namespace HereTTP
             var response = context.Response;
             if (request.HttpMethod == "GET")
             {
-                string requestPath = MassageRequestPath(request.Url.AbsolutePath),
-                    filename = MakeFileName(requestPath),
-                    shortName = MakeShortName(filename);
+                string requestPath = request.Url.AbsolutePath,
+                    requestFile = MassageRequestPath(requestPath),
+                    filename = Path.Combine(rootDirectory, requestFile);
+                bool isDirectory = Directory.Exists(filename);
+                if (isDirectory)
+                {
+                    filename = FindDefaultFile(filename);
+                }
+                string shortName = MakeShortName(filename);
 
                 Console.Write(" --> {0} --> ", shortName);
 
-                if (File.Exists(filename))
+                if (isDirectory && requestPath[requestPath.Length - 1] != '/')
+                {
+                    Redirect(response, requestPath + "/");
+                }
+                else if (File.Exists(filename))
                 {
                     try
                     {
@@ -168,16 +178,22 @@ namespace HereTTP
                 }
                 else
                 {
-                    Error(response, HttpStatusCode.NotFound, "Not found: '{0}'", shortName);
+                    Error(response, HttpStatusCode.NotFound, shortName);
                 }
             }
             else
             {
-                Error(response, HttpStatusCode.MethodNotAllowed, "Method not allowed.");
+                Error(response, HttpStatusCode.MethodNotAllowed, request.HttpMethod);
             }
 
             response.OutputStream.Flush();
             response.OutputStream.Close();
+        }
+
+        private static void Redirect(HttpListenerResponse response, string filename)
+        {
+            response.AddHeader("Location", filename);
+            SetStatus(response, HttpStatusCode.TemporaryRedirect);
         }
 
         private static void SendFile(HttpListenerResponse response, string filename)
@@ -192,7 +208,9 @@ namespace HereTTP
                 byte[] buffer = new byte[1024 * 16];
                 int nbytes;
                 while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
                     response.OutputStream.Write(buffer, 0, nbytes);
+                }
                 input.Close();
             }
             SetStatus(response, HttpStatusCode.OK);
@@ -209,9 +227,8 @@ namespace HereTTP
             return shortName;
         }
 
-        private string MakeFileName(string requestPath)
+        private string FindDefaultFile(string filename)
         {
-            var filename = Path.Combine(rootDirectory, requestPath);
             if (Directory.Exists(filename))
             {
                 for (int i = 0; i < INDEX_FILES.Length; ++i)
@@ -244,6 +261,7 @@ namespace HereTTP
 
         void Error(HttpListenerResponse response, HttpStatusCode code, string format, params string[] args)
         {
+            Console.Write(format, args);
             SetStatus(response, code);
 
             using (var writer = new StreamWriter(response.OutputStream))
