@@ -38,6 +38,10 @@ namespace HereTTP
             {"-k", new KeyValuePair<string, string>("mode", "kiosk" ) },
             {"/K", new KeyValuePair<string, string>("mode", "kiosk" ) },
 
+            {"--quiet", new KeyValuePair<string, string>("mode", "quiet" ) },
+            {"-q", new KeyValuePair<string, string>("mode", "quiet" ) },
+            {"/Q", new KeyValuePair<string, string>("mode", "quiet" ) },
+
             {"--help", new KeyValuePair<string, string>("help", "help") },
             {"/?", new KeyValuePair<string, string>("help", "help") }
         };
@@ -285,9 +289,12 @@ Switches:
     -m                  An alias for --mode.
     /M                  An alies for -m.
     startMode           Set to 'kiosk' to start in full screen mode. Defaults to no kiosk mode.
-    --kiosk             An alias for '--mode kiosk'.
-    -k                  An alias for '--mode kiosk'.
-    /K                  An alias for '--mode kiosk'.
+        --kiosk         An alias for '--mode kiosk'.
+        -k              An alias for '--mode kiosk'.
+        /K              An alias for '--mode kiosk'.
+        --quiet         An alias for '--mode quiet'.
+        -q              An alias for '--mode quiet'.
+        /Q              An alias for '--mode quiet'.
 
     --directory         Specify the path where the files are located that should be served. The command switch is not necessary for specifying the path in the last argument position.
     -d                  An alias for --directory.
@@ -319,7 +326,7 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                 {
                     Console.Error.WriteLine("No file found for browser at path {0}", browser);
                 }
-                else if (mode != "default" && mode != "kiosk")
+                else if (mode != "default" && mode != "kiosk" && mode != "quiet")
                 {
                     Console.Error.WriteLine("Unknown mode '{0}'", mode);
                 }
@@ -335,7 +342,10 @@ Any settings away from the default will cause a 'httpd.ini' file to be written i
                             server = new HTTPServer(path, p);
                             port = p;
                             arguments["port"] = p.ToString();
-                            StartBrowser(browser, port, mode, url);
+                            if (mode != "quiet")
+                            {
+                                StartBrowser(browser, port, mode, url);
+                            }
                             break;
                         }
                         catch

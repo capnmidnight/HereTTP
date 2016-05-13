@@ -159,8 +159,6 @@ namespace HereTTP
                 }
                 string shortName = MakeShortName(filename);
 
-                Console.Write(" --> {0} --> ", shortName);
-
                 if (isDirectory && requestPath[requestPath.Length - 1] != '/')
                 {
                     Redirect(response, requestPath + "/");
@@ -247,7 +245,6 @@ namespace HereTTP
 
         private static string MassageRequestPath(string requestPath)
         {
-            Console.Write(requestPath);
             requestPath = requestPath.Substring(1);
 
             if (requestPath.Length > 0 && requestPath[requestPath.Length - 1] == '/')
@@ -262,6 +259,9 @@ namespace HereTTP
         void Error(HttpListenerResponse response, HttpStatusCode code, string format, params string[] args)
         {
             Console.Write(format, args);
+            Console.Write(" ");
+            Console.WriteLine(code);
+
             SetStatus(response, code);
 
             using (var writer = new StreamWriter(response.OutputStream))
@@ -272,7 +272,6 @@ namespace HereTTP
 
         private static void SetStatus(HttpListenerResponse response, HttpStatusCode code)
         {
-            Console.WriteLine(code);
             response.StatusCode = (int)code;
         }
     }
