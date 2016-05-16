@@ -9,6 +9,52 @@ namespace HereTTP
 {
     static class Program
     {
+        const string HELP = @"Starts a basic, static HTTP server. Useful for developing and test web sites locally. DO NOT RUN IN PRODUCTION!
+
+StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPath] [(--url|-u|/U) urlPath] [(--mode|-m|\M) startMode] [(--kiosk|-k|/K)] [(--directory|-d|/D)][dirPath]
+
+Example:
+
+    # Start the server from a sibling directory of the current directory, on port 8383, and open the browser at the URL http://localhost:8383/doc/
+    StartHere -p 8383 -u /doc/ ../Primrose
+
+Switches:
+
+    --help              This help text.
+    /?                  Alias for --help.
+
+    --port              Specify a port value on which to listen.
+    -p                  Alias for --port.
+    /P                  Alies for --port.
+    portValue           An integer greater than or equal to 80 and less than 65536. Defaults to 80.
+
+    --browser           Specify an alternative browser to use to start URLs.
+    -b                  An alias for --browser.
+    /B                  An alias for --browser.
+    browserPath         A relative or fully qualified path to the browser executable. Defaults to using the Windows Shell to open the URL.
+
+    --url               Specify the path portion of the URL to open in the browser.
+    -u                  An alias for --url.
+    /U                  An alias for --url.
+    urlPath             The program will assume ""localhost"" as the host, and append the port number if it is not 80. Defaults to the empty string.
+
+    --mode              Specify the start mode for the Chrome or Internet Explorer. Firefox is not available.
+    -m                  An alias for --mode.
+    /M                  An alies for -m.
+    startMode           Set to 'kiosk' to start in full screen mode. Defaults to no kiosk mode.
+        --kiosk         An alias for '--mode kiosk'.
+        -k              An alias for '--mode kiosk'.
+        /K              An alias for '--mode kiosk'.
+        --quiet         An alias for '--mode quiet'.
+        -q              An alias for '--mode quiet'.
+        /Q              An alias for '--mode quiet'.
+
+    --directory         Specify the path where the files are located that should be served. The command switch is not necessary for specifying the path in the last argument position.
+    -d                  An alias for --directory.
+    /D                  An alias for --directory.
+    dirPath             A relative or fully qualified path to a directory full of web content files.
+
+Any settings away from the default will cause a 'httpd.ini' file to be written in the current directory, recording them for the next invocation.";
         static Dictionary<string, string> COMMAND_ALIASES = new Dictionary<string, string>()
         {
             {"--port", "port" },
@@ -197,13 +243,14 @@ namespace HereTTP
             Console.WriteLine("Starting browser '{0}' at '{1}'", browser, startURL);
 
             var parameters = new List<string>();
+            var browserName = browser.ToLowerInvariant();
             if (mode == "kiosk")
             {
-                if (browser.Contains("chrome"))
+                if(browserName.Contains("chrome"))
                 {
                     parameters.Add("--kiosk");
                 }
-                else if (browser.Contains("iexplore"))
+                else if(browserName.Contains("iexplore"))
                 {
                     parameters.Add("-k");
                 }
@@ -249,59 +296,13 @@ namespace HereTTP
         static void Main(string[] args)
         {
             var arguments = new Dictionary<string, string>();
-
             SetDefaults(arguments);
             ReadINI(arguments);
             ReadCommandLine(args, arguments);
 
             if (arguments.ContainsKey("help"))
             {
-                Console.WriteLine(@"Starts a basic, static HTTP server. Useful for developing and test web sites locally. DO NOT RUN IN PRODUCTION!
-
-StartHere [(--help|/?)] [(--port|-p|/P) portValue] [(--browser|-b|/B) browserPath] [(--url|-u|/U) urlPath] [(--mode|-m|\M) startMode] [(--kiosk|-k|/K)] [(--directory|-d|/D)][dirPath]
-
-Example:
-
-    # Start the server from a sibling directory of the current directory, on port 8383, and open the browser at the URL http://localhost:8383/doc/
-    StartHere -p 8383 -u /doc/ ../Primrose
-
-Switches:
-
-    --help              This help text.
-    /?                  Alias for --help.
-
-    --port              Specify a port value on which to listen.
-    -p                  Alias for --port.
-    /P                  Alies for --port.
-    portValue           An integer greater than or equal to 80 and less than 65536. Defaults to 80.
-
-    --browser           Specify an alternative browser to use to start URLs.
-    -b                  An alias for --browser.
-    /B                  An alias for --browser.
-    browserPath         A relative or fully qualified path to the browser executable. Defaults to using the Windows Shell to open the URL.
-
-    --url               Specify the path portion of the URL to open in the browser.
-    -u                  An alias for --url.
-    /U                  An alias for --url.
-    urlPath             The program will assume ""localhost"" as the host, and append the port number if it is not 80. Defaults to the empty string.
-
-    --mode              Specify the start mode for the Chrome or Internet Explorer. Firefox is not available.
-    -m                  An alias for --mode.
-    /M                  An alies for -m.
-    startMode           Set to 'kiosk' to start in full screen mode. Defaults to no kiosk mode.
-        --kiosk         An alias for '--mode kiosk'.
-        -k              An alias for '--mode kiosk'.
-        /K              An alias for '--mode kiosk'.
-        --quiet         An alias for '--mode quiet'.
-        -q              An alias for '--mode quiet'.
-        /Q              An alias for '--mode quiet'.
-
-    --directory         Specify the path where the files are located that should be served. The command switch is not necessary for specifying the path in the last argument position.
-    -d                  An alias for --directory.
-    /D                  An alias for --directory.
-    dirPath             A relative or fully qualified path to a directory full of web content files.
-
-Any settings away from the default will cause a 'httpd.ini' file to be written in the current directory, recording them for the next invocation.");
+                Console.WriteLine(HELP);
             }
             else
             {
