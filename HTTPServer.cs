@@ -176,7 +176,7 @@ namespace HereTTP
                 }
                 else
                 {
-                    Error(response, HttpStatusCode.NotFound, shortName);
+                    Error(response, HttpStatusCode.NotFound, "request '{0}'", shortName);
                 }
             }
             else
